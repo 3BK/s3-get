@@ -3,11 +3,11 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use aws_config::BehaviorVersion;
 use aws_credential_types::Credentials;
-use aws_sdk_s3::config::Region;
 use aws_sdk_s3::Client;
+use aws_sdk_s3::config::Region;
 use aws_smithy_http_client::tls;
 use aws_smithy_types::timeout::TimeoutConfig;
 use clap::Parser;
@@ -25,7 +25,7 @@ const DEFAULT_REGION: &str = "us-east-1";
 const CONNECT_TIMEOUT_SECS: u64 = 10;
 const OPERATION_TIMEOUT_SECS: u64 = 300;
 const ATTEMPT_TIMEOUT_SECS: u64 = 120;
-const MAX_CONFIG_SIZE: u64 = 1_048_576;     // 1 MiB
+const MAX_CONFIG_SIZE: u64 = 1_048_576; // 1 MiB
 const MAX_CA_BUNDLE_SIZE: u64 = 10_485_760; // 10 MiB
 const MAX_TARGET_LEN: usize = 2048;
 
@@ -176,8 +176,8 @@ fn config_path(override_path: Option<&PathBuf>) -> Result<PathBuf> {
 #[cfg(unix)]
 fn check_permissions(path: &Path) -> Result<()> {
     use std::os::unix::fs::MetadataExt;
-    let meta = std::fs::metadata(path)
-        .with_context(|| format!("cannot stat {}", path.display()))?;
+    let meta =
+        std::fs::metadata(path).with_context(|| format!("cannot stat {}", path.display()))?;
     let mode = meta.mode();
     if mode & 0o077 != 0 {
         bail!(
@@ -197,8 +197,8 @@ fn check_permissions(_path: &Path) -> Result<()> {
 }
 
 fn load_config(path: &Path) -> Result<McConfig> {
-    let meta = std::fs::metadata(path)
-        .with_context(|| format!("cannot stat {}", path.display()))?;
+    let meta =
+        std::fs::metadata(path).with_context(|| format!("cannot stat {}", path.display()))?;
     if meta.len() > MAX_CONFIG_SIZE {
         bail!(
             "config file {} exceeds maximum allowed size ({} bytes)",
@@ -254,10 +254,7 @@ fn filename_from_key(key: &str) -> Result<&str> {
 /// - If destination is None → current dir + filename from key
 /// - If destination is a directory or ends with '/' → append filename from key
 /// - Otherwise → use as-is
-fn resolve_destination(
-    dest: Option<&PathBuf>,
-    key: &str,
-) -> Result<PathBuf> {
+fn resolve_destination(dest: Option<&PathBuf>, key: &str) -> Result<PathBuf> {
     let filename = filename_from_key(key)?;
 
     match dest {
@@ -360,10 +357,9 @@ async fn run() -> Result<()> {
     }
 
     // ── 3. Build HTTPS client with PQ KX ────────
-    let mut builder = aws_smithy_http_client::Builder::new()
-        .tls_provider(tls::Provider::Rustls(
-            tls::rustls_provider::CryptoMode::AwsLc,
-        ));
+    let mut builder = aws_smithy_http_client::Builder::new().tls_provider(tls::Provider::Rustls(
+        tls::rustls_provider::CryptoMode::AwsLc,
+    ));
 
     if let Some(ca_path) = &args.ca_bundle {
         let ca_meta = std::fs::metadata(ca_path)
@@ -378,8 +374,7 @@ async fn run() -> Result<()> {
         let pem = std::fs::read(ca_path)
             .with_context(|| format!("failed to read CA bundle {}", ca_path.display()))?;
 
-        let trust_store = tls::TrustStore::default()
-            .with_pem_certificate(pem);
+        let trust_store = tls::TrustStore::default().with_pem_certificate(pem);
 
         let tls_ctx = tls::TlsContext::builder()
             .with_trust_store(trust_store)
@@ -469,13 +464,14 @@ async fn run() -> Result<()> {
         stream_to_stdout(resp.body).await?
     } else {
         // Create parent directories if they don't exist
-        if let Some(parent) = dest_path.parent() {
-            if !parent.as_os_str().is_empty() && !parent.exists() {
-                std::fs::create_dir_all(parent).with_context(|| {
-                    format!("failed to create directory {}", parent.display())
-                })?;
-            }
+        if let Some(parent) = dest_path.parent()
+            && !parent.as_os_str().is_empty()
+            && !parent.exists()
+        {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create directory {}", parent.display()))?;
         }
+
         stream_to_file(resp.body, &dest_path).await?
     };
 
@@ -530,21 +526,14 @@ async fn run() -> Result<()> {
 
 /// Stream the ByteStream body to a local file.
 /// Returns the total number of bytes written.
-async fn stream_to_file(
-    mut body: aws_sdk_s3::primitives::ByteStream,
-    dest: &Path,
-) -> Result<u64> {
+async fn stream_to_file(mut body: aws_sdk_s3::primitives::ByteStream, dest: &Path) -> Result<u64> {
     let mut file = File::create(dest)
         .await
         .with_context(|| format!("failed to create {}", dest.display()))?;
 
     let mut bytes_written: u64 = 0;
 
-    while let Some(chunk) = body
-        .try_next()
-        .await
-        .context("error reading object body")?
-    {
+    while let Some(chunk) = body.try_next().await.context("error reading object body")? {
         file.write_all(&chunk)
             .await
             .with_context(|| format!("error writing to {}", dest.display()))?;
@@ -552,26 +541,18 @@ async fn stream_to_file(
     }
 
     file.flush().await.context("error flushing output file")?;
-    file.shutdown()
-        .await
-        .context("error closing output file")?;
+    file.shutdown().await.context("error closing output file")?;
 
     Ok(bytes_written)
 }
 
 /// Stream the ByteStream body to stdout.
 /// Returns the total number of bytes written.
-async fn stream_to_stdout(
-    mut body: aws_sdk_s3::primitives::ByteStream,
-) -> Result<u64> {
+async fn stream_to_stdout(mut body: aws_sdk_s3::primitives::ByteStream) -> Result<u64> {
     let mut out = tokio::io::stdout();
     let mut bytes_written: u64 = 0;
 
-    while let Some(chunk) = body
-        .try_next()
-        .await
-        .context("error reading object body")?
-    {
+    while let Some(chunk) = body.try_next().await.context("error reading object body")? {
         out.write_all(&chunk)
             .await
             .context("error writing to stdout")?;
