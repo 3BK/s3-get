@@ -43,6 +43,9 @@ jobs:
           components: rustfmt, clippy
           targets: ${{ env.TARGET }}
 
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
       - name: Cache Cargo registry + build
         uses: actions/cache@v5
         with:
@@ -53,6 +56,9 @@ jobs:
           key: lint-${{ runner.os }}-${{ env.TARGET }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             lint-${{ runner.os }}-${{ env.TARGET }}-
+
+      - name: Run cargo-deny
+        run: cargo deny check
 
       - name: Check formatting
         run: cargo fmt --all -- --check
