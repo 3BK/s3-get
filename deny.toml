@@ -1,0 +1,145 @@
+# deny.toml — cargo-deny configuration for s3-get
+# ─────────────────────────────────────────────────────────────────────
+# Format: cargo-deny 0.19.x
+# Reference: https://embarkstudios.github.io/cargo-deny/checks/index.html
+# ─────────────────────────────────────────────────────────────────────
+# Last reviewed: 2026-06-09
+
+# ── General ──────────────────────────────────────────────────────────
+
+[graph]
+all-features = false
+no-default-features = false
+targets = [
+    "x86_64-unknown-linux-musl",
+]
+
+# ── Advisories ───────────────────────────────────────────────────────
+# Checks crates against the RustSec advisory database.
+#
+# In cargo-deny >= 0.16, the old severity-level fields (vulnerability,
+# unsound, notice, severity-threshold) have been removed.  All
+# vulnerability and unsound advisories now always emit errors.
+# Only `unmaintained` and `yanked` remain configurable.
+
+[advisories]
+# Scope for unmaintained advisories.  Values:
+#   "all"        — error on any unmaintained crate
+#   "workspace"  — error only for workspace crates
+#   "transitive" — error only for transitive deps
+#   "none"       — do not check
+unmaintained = "workspace"
+
+# What happens when a yanked crate version is encountered.
+# "deny" | "warn" | "allow"
+yanked = "warn"
+
+# Ignore specific advisories (use sparingly, with justification).
+ignore = [
+    # Example:
+    # { id = "RUSTSEC-2026-XXXX", reason = "not reachable from our code" },
+]
+
+# ── Licenses ─────────────────────────────────────────────────────────
+# Controls which licenses are permitted in the dependency tree.
+#
+# In cargo-deny >= 0.16, the old fields (unlicensed, deny, copyleft,
+# allow-osi-fsf-free, default) have been removed.  All licenses are
+# denied unless explicitly listed in `allow`.  Use `[[licenses.exceptions]]`
+# for per-crate overrides and `[[licenses.clarify]]` for crates with
+# non-machine-readable license files.
+
+[licenses]
+# Warn if an allowed license is never encountered in the dependency tree.
+unused-allowed-license = "warn"
+
+# Confidence threshold for license file detection (0.0 – 1.0).
+confidence-threshold = 0.95
+
+# Licenses that are explicitly permitted for all crates.
+allow = [
+    # ── Permissive (OSI-approved) ────────────────────────────────────
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+
+    # ── Unicode / ICU ────────────────────────────────────────────────
+    # Used by icu_*, tinystr, litemap, writeable, etc. in the AWS SDK
+    # internationalization stack.
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+
+    # ── OpenSSL (aws-lc-sys) ─────────────────────────────────────────
+    # aws-lc is dual-licensed Apache-2.0 OR ISC, but the sys crate
+    # bundles OpenSSL-derived code under the OpenSSL license.
+    "OpenSSL",
+    
+    # Mozilla License
+    "MPL-2.0",
+]
+
+# ── Per-crate license exceptions ─────────────────────────────────────
+# Use [[licenses.exceptions]] when a specific crate needs a license
+# that you don't want to allow globally.
+#
+# Example:
+# [[licenses.exceptions]]
+# allow = ["MPL-2.0"]
+# name = "some-crate"
+
+# ── License clarifications ───────────────────────────────────────────
+# For crates with non-standard LICENSE files that cargo-deny can't
+# auto-detect.
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+# ── Private crates ───────────────────────────────────────────────────
+# If you have private registry crates, configure them here.
+[licenses.private]
+ignore = false
+registries = []
+
+# ── Bans ─────────────────────────────────────────────────────────────
+# Ban specific crates or control duplicate versions.
+
+[bans]
+# Warn when multiple versions of the same crate are compiled.
+multiple-versions = "warn"
+# Warn on wildcard dependencies (e.g., version = "*").
+wildcards = "warn"
+# Highlight specific crates that should not be in the tree.
+deny = [
+    # Uncomment to enforce rustls-only TLS (ban OpenSSL bindings):
+    # { name = "openssl-sys", wrappers = [] },
+]
+# Allow specific duplicates that are known and acceptable.
+skip = [
+    # Example: two versions of itoa pulled by different SDK crates
+    # { name = "itoa", version = "0.4" },
+]
+skip-tree = [
+    # Example: skip duplicate checking under a known-heavy subtree
+    # { name = "aws-sdk-s3", version = "*" },
+]
+
+# ── Sources ──────────────────────────────────────────────────────────
+# Restrict where crates can be fetched from.
+
+[sources]
+# Deny crates from unknown registries.
+unknown-registry = "deny"
+# Deny crates fetched directly from git.
+unknown-git = "deny"
+# Only allow crates from the official crates.io registry.
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index",
+]
+# No git sources allowed by default.
+allow-git = []
